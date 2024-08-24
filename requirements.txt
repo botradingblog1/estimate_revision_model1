@@ -2,3 +2,5 @@ numpy
 pandas
 schedule
 requests
+loguru
+lxml

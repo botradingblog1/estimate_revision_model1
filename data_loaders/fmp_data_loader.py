@@ -10,7 +10,6 @@ class Period(Enum):
     ANNUAL = "annual"
 
 
-
 class FmpDataLoader:
     """
     FmpDataLoader provides methods to interact with the Financial Modeling Prep (FMP) API to fetch various financial data.
@@ -187,6 +186,11 @@ class FmpDataLoader:
                 data = response.json()
                 if data:
                     surprises_df = pd.DataFrame(data)
+                    if len(surprises_df) > 0:
+                        # Convert date to pd format
+                        surprises_df['date'] = pd.to_datetime(surprises_df['date'])
+                        # Sort by date
+                        surprises_df.sort_values(by="date", ascending=True)
                     return surprises_df
                 else:
                     print(f"No data found for {symbol}.")
