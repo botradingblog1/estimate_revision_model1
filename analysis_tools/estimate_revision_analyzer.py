@@ -14,41 +14,75 @@ class EstimateRevisionAnalyzer:
             return tracking_df
         return None
 
-    def calculate_estimate_percentage_change(self, group):
-        # Calculate percentage change between consecutive tracking dates within the group
-        group = group.sort_values(by='tracking_date', ascending=True)
-        if len(group) < 2:
-            return None  # Return None if there are not enough data points to calculate change
+    def calculate_estimate_percentage_change(self, tracking_df):
+        # Calculate percentage change between the first and last tracking dates within each group
+        tracking_df = tracking_df.sort_values(by='tracking_date', ascending=True)
+        results = []
+        groups = tracking_df.groupby("target_date")
 
-        percentage_changes = group['estimatedEpsAvg'].pct_change().dropna() * 100
-        return percentage_changes.mean() if not percentage_changes.empty else None
+        for target_date, group in groups:
+            if len(group) < 2:
+                row = {
+                    'target_date': target_date,
+                    'eps_percent_change': 0.0
+                }
+                results.append(row)
+                continue
 
-    def calculate_agreement_score(self, group):
+            # Calculate percentage change between the two most recent records
+            symbol = group['symbol']
+            previous_value = group['estimatedEpsAvg'].iloc[-2]
+            last_value = group['estimatedEpsAvg'].iloc[-1]
+
+            # Calculate the percentage change
+            eps_percent_change = ((last_value - previous_value) / previous_value) * 100
+
+            row = {
+                'symbol': symbol,
+                'target_date': target_date,
+                'eps_percent_change': eps_percent_change
+            }
+            results.append(row)
+
+        result_df = pd.DataFrame(results)
+        return result_df
+
+    def calculate_agreement_score(self, tracking_df):
         # Calculate the agreement score based on the direction of changes
-        group = group.sort_values(by='tracking_date', ascending=True)
-        score = 0
-        for i in range(1, len(group)):
-            if group.iloc[i]['estimatedEpsAvg'] > group.iloc[i - 1]['estimatedEpsAvg']:
-                score += 1  # Increase
-            elif group.iloc[i]['estimatedEpsAvg'] < group.iloc[i - 1]['estimatedEpsAvg']:
-                score -= 1  # Decrease
-            # No change contributes 0 to the score
-        return score
+        tracking_df = tracking_df.sort_values(by='tracking_date', ascending=True)
+        groups = tracking_df.groupby("target_date")
+        results = []
 
-    def normalize_series(self, series):
-        """Normalize a pandas series to a 0-1 range"""
-        if series.empty or series.isna().all():
-            return series  # Return the series as is if it's empty or all values are NaN
+        for target_date, group in groups:
+            if len(group) < 2:
+                row = {
+                    'symbol': group['symbol'].iloc[0],  # Extracting symbol from the group
+                    'target_date': target_date,
+                    'agreement_score': 0.0
+                }
+                results.append(row)
+                continue
 
-        min_val = series.min()
-        max_val = series.max()
+            # Initialize the agreement score
+            score = 0
 
-        if min_val == max_val:
-            # If all values are the same, normalization would result in division by zero,
-            # So return a series of 0.5s (or any constant value, since they are all the same)
-            return pd.Series(np.ones(len(series)) * 0.5, index=series.index)
+            # Iterate over the group rows to calculate the agreement score
+            for i in range(1, len(group)):
+                if group['estimatedEpsAvg'].iloc[i] > group['estimatedEpsAvg'].iloc[i - 1]:
+                    score += 1  # Increase in EPS estimate
+                elif group['estimatedEpsAvg'].iloc[i] < group['estimatedEpsAvg'].iloc[i - 1]:
+                    score -= 1  # Decrease in EPS estimate
+                # No change contributes 0 to the score
 
-        return (series - min_val) / (max_val - min_val)
+            row = {
+                'symbol': group['symbol'].iloc[0],  # Extracting symbol from the group
+                'target_date': target_date,
+                'agreement_score': score
+            }
+            results.append(row)
+
+        result_df = pd.DataFrame(results)
+        return result_df
 
     def check_revisions(self, symbol_list):
         # Load tracking files
@@ -67,24 +101,20 @@ class EstimateRevisionAnalyzer:
             symbol_annual_tracking_df = annual_tracking_df[annual_tracking_df['symbol'] == symbol]
 
             # Calculate percentage changes by target_date
-            quarterly_percentage_changes = symbol_quarterly_tracking_df.groupby('target_date').apply(
-                self.calculate_estimate_percentage_change).dropna()
-            annual_percentage_changes = symbol_annual_tracking_df.groupby('target_date').apply(
-                self.calculate_estimate_percentage_change).dropna()
+            quarterly_eps_change_df = self.calculate_estimate_percentage_change(symbol_quarterly_tracking_df)
+            annual_eps_change_df = self.calculate_estimate_percentage_change(symbol_annual_tracking_df)
 
             # Calculate the average of all future percentage changes
-            avg_quarterly_percent_change = quarterly_percentage_changes.mean()
-            avg_annual_percent_change = annual_percentage_changes.mean()
+            avg_quarterly_percent_change = quarterly_eps_change_df['eps_percent_change'].mean()
+            avg_annual_percent_change = annual_eps_change_df['eps_percent_change'].mean()
 
             # Calculate agreement score
-            quarterly_agreement_results = symbol_quarterly_tracking_df.groupby('target_date').apply(
-                self.calculate_agreement_score).dropna()
-            annual_agreement_results = symbol_annual_tracking_df.groupby('target_date').apply(
-                self.calculate_agreement_score).dropna()
+            quarterly_agreement_results_df = self.calculate_agreement_score(symbol_quarterly_tracking_df)
+            annual_agreement_results_df = self.calculate_agreement_score(symbol_annual_tracking_df)
 
             # Calculate the average of all agreement scores
-            avg_quarterly_agreement_score = quarterly_agreement_results.mean()
-            avg_annual_agreement_score = annual_agreement_results.mean()
+            avg_quarterly_agreement_score = quarterly_agreement_results_df['agreement_score'].mean()
+            avg_annual_agreement_score = annual_agreement_results_df['agreement_score'].mean()
 
             # Create results row
             results_record = {
@@ -98,24 +128,6 @@ class EstimateRevisionAnalyzer:
 
         # Convert results to dataframe
         results_df = pd.DataFrame(results)
-
-        # Normalize scores
-        results_df['normalized_quarterly_percent_change'] = self.normalize_series(results_df['avg_quarterly_percent_change'])
-        results_df['normalized_annual_percent_change'] = self.normalize_series(results_df['avg_annual_percent_change'])
-        results_df['normalized_quarterly_agreement_score'] = self.normalize_series(results_df['avg_quarterly_agreement_score'])
-        results_df['normalized_annual_agreement_score'] = self.normalize_series(results_df['avg_annual_agreement_score'])
-
-        # Calculate weighted score with quarterly/annual 60/40 percent and percent change/agreement 70/30
-        results_df['final_score'] = (
-            0.6 * (
-            0.7 * results_df['normalized_quarterly_percent_change'] +
-            0.3 * results_df['normalized_quarterly_agreement_score']
-        ) +
-            0.4 * (
-                0.7 * results_df['normalized_annual_percent_change'] +
-                0.3 * results_df['normalized_annual_agreement_score']
-            )
-        )
 
         return results_df
 

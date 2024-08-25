@@ -18,7 +18,7 @@ def track_estimate_data():
     pass
 
 def schedule_events():
-    schedule.every().day.at('01:01').do(track_estimate_data)
+    schedule.every().day.at('01:30').do(track_estimate_data)
 
 
 if __name__ == "__main__":
@@ -35,10 +35,10 @@ if __name__ == "__main__":
     #estimate_tracker.track_estimates()
 
     est_rev_analyzer = EstimateRevisionAnalyzer()
-    #results_df = est_rev_analyzer.check_revisions(symbol_list)
+    results_df = est_rev_analyzer.check_revisions(symbol_list)
 
     est_surprise_analyzer = EarningsSurpriseAnalyzer(FMP_API_KEY)
-    est_surprise_analyzer.find_earnings_surprises(symbol_list)
+    #est_surprise_analyzer.find_earnings_surprises(symbol_list)
 
     """
 
