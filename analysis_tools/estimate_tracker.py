@@ -11,7 +11,7 @@ class EstimateTracker:
 
     def load_tracking_file(self, file_name):
         # Load quarterly or annual tracking file
-        path = os.path.join(RESULTS_DIR, file_name)
+        path = os.path.join(CACHE_DIR, file_name)
         if os.path.exists(path):
             tracking_df = pd.read_csv(path, parse_dates=['target_date', 'tracking_date'])
         else:
@@ -65,8 +65,8 @@ class EstimateTracker:
         updated_annual_tracking_df = self.fetch_and_add_new_estimates(symbol_list, annual_tracking_df, Period.ANNUAL)
 
         # Save the updated tracking data
-        quarterly_path = os.path.join(RESULTS_DIR, QUARTERY_EPS_ESTIMATES_FILE_NAME)
+        quarterly_path = os.path.join(CACHE_DIR, QUARTERY_EPS_ESTIMATES_FILE_NAME)
         updated_quarterly_tracking_df.to_csv(quarterly_path, index=False)
 
-        annual_path = os.path.join(RESULTS_DIR, ANNUAL_EPS_ESTIMATES_FILE_NAME)
+        annual_path = os.path.join(CACHE_DIR, ANNUAL_EPS_ESTIMATES_FILE_NAME)
         updated_annual_tracking_df.to_csv(annual_path, index=False)

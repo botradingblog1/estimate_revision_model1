@@ -2,6 +2,7 @@ from config import *
 import pandas as pd
 from datetime import datetime, timedelta
 from data_loaders.fmp_data_loader import FmpDataLoader
+from utils.log_utils import *
 import os
 
 
@@ -10,6 +11,7 @@ class EarningsSurpriseAnalyzer:
         self.fmp_data_loader = FmpDataLoader(fmp_api_key)
 
     def find_earnings_surprises(self, symbol_list: list):
+        logi("Finding earnings surprises...")
         earnings_surprise_results = []
         for symbol in symbol_list:
             try:
@@ -33,7 +35,7 @@ class EarningsSurpriseAnalyzer:
 
                     # Calculate earnings surprise change
                     earnings_surprise_change = ((last_record['actualEarningResult'] - last_record['estimatedEarning']) /
-                                                last_record['estimatedEarning']) * 100
+                                                last_record['estimatedEarning'])
 
                     # Append the result
                     result_record = {
@@ -49,7 +51,9 @@ class EarningsSurpriseAnalyzer:
         if earnings_surprise_results:
             earnings_surprise_results_df = pd.DataFrame(earnings_surprise_results)
             earnings_surprise_results_df.to_csv(os.path.join(CACHE_DIR, "earnings_surprise_results_df.csv"), index=False)
+            return earnings_surprise_results_df
         else:
             print("No earnings surprise data found for the given symbols.")
+            return None
 
 

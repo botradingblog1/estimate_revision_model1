@@ -3,12 +3,13 @@ import numpy as np
 from config import *
 from datetime import datetime
 import os
+from utils.log_utils import *
 
 
 class EstimateRevisionAnalyzer:
     def load_tracking_file(self, file_name):
         # Load quarterly or annual tracking file
-        path = os.path.join(RESULTS_DIR, file_name)
+        path = os.path.join(CACHE_DIR, file_name)
         if os.path.exists(path):
             tracking_df = pd.read_csv(path, parse_dates=['target_date', 'tracking_date'])
             return tracking_df
@@ -85,6 +86,7 @@ class EstimateRevisionAnalyzer:
         return result_df
 
     def check_revisions(self, symbol_list):
+        logi("Analyzing estimate revisions")
         # Load tracking files
         quarterly_tracking_df = self.load_tracking_file(QUARTERY_EPS_ESTIMATES_FILE_NAME)
         annual_tracking_df = self.load_tracking_file(ANNUAL_EPS_ESTIMATES_FILE_NAME)
