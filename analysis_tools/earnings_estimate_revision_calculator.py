@@ -24,31 +24,37 @@ class EarningsEstimateRevisionCalculator:
             loge(ex)
         return 0.0
 
-    def calculate_agreement(self, symbol, estimate_tracking_df):
+    def calculate_agreement(self, symbol, estimate_tracking_df, days=30):
         """
-        Calculate changes in estimates over a time period,
-        and then count the ratio of upwards revisions versus downward revisions.
+        Calculate the agreement ratio of upwards revisions versus total revisions
+        for a given symbol over the past `days` days.
         """
+        # Filter data for the specific symbol
         symbol_df = estimate_tracking_df[estimate_tracking_df['symbol'] == symbol]
         if symbol_df.empty:
             return 0.0
 
-        # Get recent data - last month
-        one_month_ago = datetime.now() - timedelta(days=30)
-        symbol_df = symbol_df[symbol_df['tracking_date'] >= one_month_ago]
+        # Filter for data within the last `days` period
+        cutoff_date = datetime.now() - timedelta(days=days)
+        symbol_df = symbol_df[symbol_df['tracking_date'] >= cutoff_date]
 
         if symbol_df.empty:
             return 0.0
 
-        # Calculate upward/downward changes
-        symbol_df['estimatedEpsChange'] = symbol_df['estimatedEpsAvg'].pct_change()
-        upward_revisions = symbol_df[symbol_df['estimatedEpsChange'] > 0].shape[0]
-        downward_revisions = symbol_df[symbol_df['estimatedEpsChange'] < 0].shape[0]
-        total_revisions = upward_revisions + downward_revisions
+        # Calculate percentage change in estimates
+        symbol_df['estimatedEpsChange'] = symbol_df.groupby('date')['estimatedEpsAvg'].transform(pd.Series.pct_change)
+        symbol_df.dropna(subset=['estimatedEpsChange'], inplace=True)
 
+        # Count upward and downward revisions
+        upward_revisions = (symbol_df['estimatedEpsChange'] > 0).sum()
+        downward_revisions = (symbol_df['estimatedEpsChange'] < 0).sum()
+
+        # Calculate total revisions
+        total_revisions = upward_revisions + downward_revisions
         if total_revisions == 0:
             return 0.0
 
+        # Calculate agreement score
         agreement_score = upward_revisions / total_revisions
         return agreement_score
 
@@ -88,24 +94,35 @@ class EarningsEstimateRevisionCalculator:
 
     def calculate_upside(self, symbol, estimate_tracking_df):
         """
-        Calculates the average over a period of time as a ‘general consensus’.
-        The 'Upside' is the difference between the average and the most recent estimate
+        Calculates the upside as the percentage change between the most recent consensus
+        and the average consensus over a specified time period.
         """
+        # Filter data for the given symbol
         symbol_df = estimate_tracking_df[estimate_tracking_df['symbol'] == symbol]
         if symbol_df.empty:
             return 0.0
-        recent_consensus = symbol_df['estimatedEpsAvg'].iloc[-1]
 
-        # Get the estimates for the last three months
-        three_month_avg_consensus = symbol_df[symbol_df['tracking_date'] >= datetime.now() - timedelta(days=90)][
-            'estimatedEpsAvg'].mean()
+        # Filter data for the last 90 days
+        cutoff_date = datetime.now() - timedelta(days=90)
+        recent_estimates_df = symbol_df[symbol_df['tracking_date'] >= cutoff_date]
 
-        # Avoid division by zero
-        if pd.isna(three_month_avg_consensus) or three_month_avg_consensus == 0:
+        if recent_estimates_df.empty:
             return 0.0
 
-        # Calculate change between most recent and average consensus estimates
-        upside_score = ((recent_consensus - three_month_avg_consensus) / three_month_avg_consensus) * 100
+        # Calculate average consensus for the last 90 days
+        avg_recent_consensus = recent_estimates_df['estimatedEpsAvg'].mean()
+
+        # Extract the most recent tracking date and its corresponding consensus
+        most_recent_tracking_date = recent_estimates_df['tracking_date'].max()
+        last_estimates_df = recent_estimates_df[recent_estimates_df['tracking_date'] == most_recent_tracking_date]
+        last_consensus = last_estimates_df['estimatedEpsAvg'].mean()
+
+        # Handle edge cases
+        if pd.isna(avg_recent_consensus) or pd.isna(last_consensus) or avg_recent_consensus == 0:
+            return 0.0
+
+        # Calculate upside as a percentage change
+        upside_score = ((last_consensus - avg_recent_consensus) / avg_recent_consensus) * 100
         return upside_score
 
     def calculate_earnings_estimate_revisions(self):
@@ -149,8 +166,8 @@ class EarningsEstimateRevisionCalculator:
 
         results_norm_df['weighted_score'] = (
             results_norm_df['agreement_score'] * 0.20 +
-            results_norm_df['magnitude_score'] * 0.40 +
-            results_norm_df['upside_score'] * 0.2 +
+            results_norm_df['magnitude_score'] * 0.30 +
+            results_norm_df['upside_score'] * 0.3 +
             results_norm_df['avg_earnings_surprise'] * 0.20
         )
 
@@ -162,7 +179,6 @@ class EarningsEstimateRevisionCalculator:
         final_results_df.sort_values(by=['weighted_score'], ascending=False, inplace=True)
 
         file_name = f"earnings_revision_results_{datetime.today().strftime('%Y-%m-%d')}.csv"
-        store_csv(RESULTS_DIR, file_name, results_norm_df)
-
-
-
+        store_csv(RESULTS_DIR, file_name, final_results_df)
+        path = os.path.join(RESULTS_DIR, file_name)
+        logd(f"Results file stored to: {path}")

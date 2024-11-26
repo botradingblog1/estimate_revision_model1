@@ -12,10 +12,8 @@ FMP_API_KEY = get_os_variable('FMP_API_KEY')
 
 
 def perform_tasks():
-    """
     tracker = EstimateTracker(FMP_API_KEY)
     tracker.track_estimates()
-    """
 
     revision_calculator = EarningsEstimateRevisionCalculator(FMP_API_KEY)
     revision_calculator.calculate_earnings_estimate_revisions()
@@ -33,7 +31,7 @@ if __name__ == "__main__":
     create_output_directories()
     setup_logger("estimate_revision_model_log.txt")
 
-    perform_tasks()
+    #perform_tasks()
 
     #  Schedule events - to run the script at regular intervals
     schedule_events()
