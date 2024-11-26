@@ -4,3 +4,4 @@ schedule
 requests
 loguru
 lxml
+scikit-learn

@@ -5,8 +5,7 @@ from sklearn.preprocessing import MinMaxScaler
 import os
 
 
-def normalize_dataframe(df):
-    column_list = df.columns
+def normalize_dataframe(df: pd.DataFrame, column_list: list):
     scaler = MinMaxScaler(feature_range=(0, 100))
 
     # Check if columns exist and if they have more than one unique value
