@@ -125,6 +125,27 @@ class EarningsEstimateRevisionCalculator:
         upside_score = ((last_consensus - avg_recent_consensus) / avg_recent_consensus) * 100
         return upside_score
 
+    def calculate_avg_number_analysts(self, symbol, estimate_tracking_df):
+        """
+        Calculates the upside as the percentage change between the most recent consensus
+        and the average consensus over a specified time period.
+        """
+        # Filter data for the given symbol
+        symbol_df = estimate_tracking_df[estimate_tracking_df['symbol'] == symbol]
+        if symbol_df.empty:
+            return 0.0
+
+        # Filter data for the last 90 days
+        cutoff_date = datetime.now() - timedelta(days=90)
+        recent_estimates_df = symbol_df[symbol_df['tracking_date'] >= cutoff_date]
+
+        if recent_estimates_df.empty:
+            return 0.0
+
+        # Calculate average number of analysis for the last 90 days
+        avg_num_analysts = recent_estimates_df['numberAnalystsEstimatedEps'].mean()
+        return avg_num_analysts
+
     def calculate_earnings_estimate_revisions(self):
         logi("Calculating earnings estimate revisions...")
         symbol_loader = MarketSymbolLoader()
@@ -145,13 +166,15 @@ class EarningsEstimateRevisionCalculator:
             magnitude_score = self.calculate_magnitude(symbol, estimate_tracking_df)
             upside_score = self.calculate_upside(symbol, estimate_tracking_df)
             avg_earnings_surprise = self.calculate_earnings_surprise(symbol)
+            avg_num_analysts = self.calculate_avg_number_analysts(symbol, estimate_tracking_df)
 
             result = {
                 'symbol': symbol,
                 'agreement_score': agreement_score,
                 'magnitude_score': magnitude_score,
                 'upside_score': upside_score,
-                'avg_earnings_surprise': avg_earnings_surprise
+                'avg_earnings_surprise': avg_earnings_surprise,
+                'avg_num_analysts': avg_num_analysts
             }
             results.append(result)
             # Throttle FMP API calls for earnings surprises
@@ -161,14 +184,15 @@ class EarningsEstimateRevisionCalculator:
 
         results_norm_df = normalize_dataframe(
             results_df.copy(),
-            column_list=['agreement_score', 'magnitude_score', 'upside_score', 'avg_earnings_surprise']
+            column_list=['agreement_score', 'magnitude_score', 'upside_score', 'avg_earnings_surprise', 'avg_num_analysts']
         )
 
         results_norm_df['weighted_score'] = (
-            results_norm_df['agreement_score'] * 0.20 +
+            results_norm_df['agreement_score'] * 0.10 +
             results_norm_df['magnitude_score'] * 0.30 +
             results_norm_df['upside_score'] * 0.3 +
-            results_norm_df['avg_earnings_surprise'] * 0.20
+            results_norm_df['avg_earnings_surprise'] * 0.20 +
+            results_norm_df['avg_num_analysts'] * 0.10
         )
 
         # Merge normalized weighted score back to the original DataFrame
@@ -178,7 +202,7 @@ class EarningsEstimateRevisionCalculator:
         # Sort by weighted score
         final_results_df.sort_values(by=['weighted_score'], ascending=False, inplace=True)
 
-        file_name = f"earnings_revision_results_{datetime.today().strftime('%Y-%m-%d')}.csv"
+        file_name = f"earnings_revision_results.csv"
         store_csv(RESULTS_DIR, file_name, final_results_df)
         path = os.path.join(RESULTS_DIR, file_name)
         logd(f"Results file stored to: {path}")

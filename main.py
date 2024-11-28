@@ -18,6 +18,10 @@ def perform_tasks():
     revision_calculator = EarningsEstimateRevisionCalculator(FMP_API_KEY)
     revision_calculator.calculate_earnings_estimate_revisions()
 
+def run_estimate_revision_calculator():
+    revision_calculator = EarningsEstimateRevisionCalculator(FMP_API_KEY)
+    revision_calculator.calculate_earnings_estimate_revisions()
+
 
 def schedule_events():
     schedule.every().monday.at('01:30').do(perform_tasks)
@@ -31,7 +35,7 @@ if __name__ == "__main__":
     create_output_directories()
     setup_logger("estimate_revision_model_log.txt")
 
-    #perform_tasks()
+    run_estimate_revision_calculator()
 
     #  Schedule events - to run the script at regular intervals
     schedule_events()
