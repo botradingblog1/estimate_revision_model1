@@ -19,7 +19,7 @@ class EarningsEstimateRevisionCalculator:
             if avg_earnings_surprise is None:
                 return 0.0
 
-            return avg_earnings_surprise
+            return round(avg_earnings_surprise, 2)
         except Exception as ex:
             loge(ex)
         return 0.0
@@ -56,7 +56,7 @@ class EarningsEstimateRevisionCalculator:
 
         # Calculate agreement score
         agreement_score = upward_revisions / total_revisions
-        return agreement_score
+        return round(agreement_score, 2)
 
     def calculate_magnitude(self, symbol, estimate_tracking_df):
         """
@@ -90,7 +90,7 @@ class EarningsEstimateRevisionCalculator:
                               next_fiscal_year_df['estimatedEpsAvg'].iloc[0]) * 100 if not next_fiscal_year_df.empty else 0
 
         magnitude_score = (current_fiscal_change + next_fiscal_change) / 2
-        return magnitude_score
+        return round(magnitude_score, 2)
 
     def calculate_upside(self, symbol, estimate_tracking_df):
         """
@@ -123,7 +123,7 @@ class EarningsEstimateRevisionCalculator:
 
         # Calculate upside as a percentage change
         upside_score = ((last_consensus - avg_recent_consensus) / avg_recent_consensus) * 100
-        return upside_score
+        return round(upside_score, 2)
 
     def calculate_avg_number_analysts(self, symbol, estimate_tracking_df):
         """
@@ -189,9 +189,9 @@ class EarningsEstimateRevisionCalculator:
 
         results_norm_df['weighted_score'] = (
             results_norm_df['agreement_score'] * 0.10 +
-            results_norm_df['magnitude_score'] * 0.30 +
-            results_norm_df['upside_score'] * 0.3 +
-            results_norm_df['avg_earnings_surprise'] * 0.20 +
+            results_norm_df['magnitude_score'] * 0.35 +
+            results_norm_df['upside_score'] * 0.35 +
+            results_norm_df['avg_earnings_surprise'] * 0.10 +
             results_norm_df['avg_num_analysts'] * 0.10
         )
 
